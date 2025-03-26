@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "composite": true,
+    "target": "ES2022",
+    "module": "NodeNext",
+    "lib": ["ESNext"],
+    "moduleResolution": "NodeNext",
+    "rootDir": ".",
+    "outDir": "build",
+
+    "importHelpers": true,
+    "skipLibCheck": true,
+    "allowJs": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    //"allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    //"noEmit": true,
+
+    "baseUrl": "src",
+    // TSC doesn't resolve paths on build, so let's not use it.
+    // "paths": {
+    //   "@/*": ["*"]
+    // },
+    /* Linting */
+    "strict": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    "noUncheckedIndexedAccess": true
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "name": "@floriancargoet/ink-codegen",
+  "version": "0.0.0",
+  "description": "Code generator for the ink language.",
+  "type": "module",
+  "author": "Florian Cargoët",
+  "license": "MIT",
+  "main": "./build/src/index.js",
+  "types": "./build/src/index.d.ts",
+  "files": [
+    "build/",
+    "!build/*.tsbuildinfo"
+  ],
+  "scripts": {
+    "start": "node build/src/main.js",
+    "clean": "rimraf coverage build tmp",
+    "prebuild": "npm run lint",
+    "build": "tsc -p tsconfig.src.json",
+    "build:watch": "tsc -w -p tsconfig.src.json",
+    "build:release": "npm run clean && tsc -p tsconfig.release.json",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage.enabled --coverage.all",
+    "prettier": "prettier \"{src,__{tests}__}/**/*.{ts,mts}\" --config .prettierrc --write",
+    "test:watch": "vitest",
+    "local-alpha": "NO_GIT=1 npm --no-git-tag-version version prerelease --preid=alpha && npm pack",
+    "version": "if [ \"$NO_GIT\" != 1 ]; then git add -A . ; fi",
+    "postversion": "if [ \"$NO_GIT\" != 1 ]; then git push && git push --tags ; fi"
+  },
+  "dependencies": {
+    "inflection": "3.0.2",
+    "tslib": "2.8"
+  },
+  "devDependencies": {
+    "@eslint-community/eslint-plugin-eslint-comments": "4.4.1",
+    "@eslint/js": "9.22.0",
+    "@types/inflection": "1.13.2",
+    "@types/node": "22.13.11",
+    "@typescript-eslint/parser": "8.27.0",
+    "@vitest/coverage-v8": "3.0.9",
+    "@vitest/eslint-plugin": "1.1",
+    "eslint": "9.22.0",
+    "eslint-config-prettier": "10.1.1",
+    "eslint-import-resolver-typescript": "4.2.0",
+    "eslint-plugin-import": "2.31.0",
+    "eslint-plugin-promise": "7.2.1",
+    "globals": "16.0.0",
+    "prettier": "3.5.3",
+    "rimraf": "6.0",
+    "typescript": "5.8.2",
+    "typescript-eslint": "8.27.0",
+    "vite-tsconfig-paths": "5.1.4",
+    "vitest": "3.0.9"
+  }
+}
