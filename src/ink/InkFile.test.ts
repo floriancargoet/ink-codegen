@@ -6,7 +6,7 @@ test("ink file", () => {
   tree.include("utils.ink");
   tree.function("database", ["op", "value"], [t.code("-> DONE")]);
   const definePerson = tree.function(
-    "define_person",
+    "get_set_person",
     ["op", "value", { name: "name", ref: true }],
     [t.code("-> DONE")],
   );
@@ -16,12 +16,12 @@ test("ink file", () => {
   expect(tree.toString()).toMatchInlineSnapshot(`
     "INCLUDE utils.ink
 
-    ~ define_person(x, y, z)
+    ~ get_set_person(x, y, z)
 
     === function database(op, value)
     -> DONE
 
-    === function define_person(op, value, ref name)
+    === function get_set_person(op, value, ref name)
     -> DONE
 
     === start

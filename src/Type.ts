@@ -22,22 +22,35 @@ export type AttributeDefinition<T extends PrimitiveType> =
       default?: JSValueType<T>;
     }
   | {
-      type: "knot";
+      type: "divert";
       name: string;
       constant?: boolean;
       default?: string;
+    }
+  | {
+      type: "reference";
+      name: string;
+      constant?: boolean;
+      default?: string; // FIXME?
     };
 
 export class Type<T extends PrimitiveType> {
   name: string;
   pluralName: string;
-  attributes?: Array<AttributeDefinition<T>>;
+  attributes: Array<AttributeDefinition<T>>;
   instances: Array<Instance<T>> = [];
 
-  constructor(config: TypeConfig<T>) {
+  constructor(nameOrConfig: string | TypeConfig<T>) {
+    const config = typeof nameOrConfig === "string" ? { name: nameOrConfig } : nameOrConfig;
+
     this.name = config.name;
     this.pluralName = config.pluralName ?? pluralize(this.name);
-    this.attributes = config.attributes;
+    this.attributes = config.attributes ?? [];
+  }
+
+  attr(...attrDefs: Array<AttributeDefinition<T>>) {
+    this.attributes?.push(...attrDefs);
+    return this;
   }
 
   create(config: InstanceConfig) {
@@ -60,7 +73,8 @@ export class Type<T extends PrimitiveType> {
     // We trust the inst to be correctly set up, we can't verify that with types.
     const value = inst.attributes?.[attr.name] as JSValueType<T> | undefined;
     if (!value) return;
-    if (attr.type === "knot") return new Reference({ name: String(value), divert: true });
+    if (attr.type === "divert") return new Reference({ name: String(value), divert: true });
+    if (attr.type === "reference") return new Reference({ name: String(value) });
     return new Value(attr.type, value);
   }
 
@@ -68,8 +82,11 @@ export class Type<T extends PrimitiveType> {
     let value: Value<T> | Reference | undefined;
     value = this.getInstValue(inst, attr);
     if (value == null && attr.default) {
-      if (attr.type === "knot") value = new Reference({ name: String(attr.default), divert: true });
-      else value = new Value(attr.type, attr.default as JSValueType<T>);
+      if (attr.type === "divert") {
+        value = new Reference({ name: String(attr.default), divert: true });
+      } else if (attr.type === "reference") {
+        value = new Reference({ name: String(attr.default) });
+      } else value = new Value(attr.type, attr.default as JSValueType<T>);
     }
 
     if (value == null) value = defaultForAttribute(attr);
@@ -78,7 +95,7 @@ export class Type<T extends PrimitiveType> {
 
   generateAttributeVariables() {
     if (this.instances.length === 0) return null;
-    if (this.attributes == null || this.attributes.length === 0) return null;
+    if (this.attributes.length === 0) return null;
 
     const statements: Array<Statement> = [];
     for (const inst of this.instances) {
@@ -94,11 +111,11 @@ export class Type<T extends PrimitiveType> {
   }
 
   getDefineFnName() {
-    return `define_${this.name.toLowerCase()}`;
+    return `get_set_${this.name.toLowerCase()}`;
   }
 
   generateDefineFunction() {
-    if (this.attributes == null || this.attributes.length === 0) return null;
+    if (this.attributes.length === 0) return null;
 
     const defineSwitch = new SwitchStatement(new Reference({ name: "op" }));
     for (const attr of this.attributes) {
@@ -124,7 +141,7 @@ export class Type<T extends PrimitiveType> {
   }
 
   generateDatabaseLines(dbSwitch: SwitchStatement) {
-    if (this.attributes == null || this.attributes.length === 0) return null;
+    if (this.attributes.length === 0) return null;
 
     const fnName = this.getDefineFnName();
     for (const inst of this.instances) {
@@ -134,7 +151,7 @@ export class Type<T extends PrimitiveType> {
         }
         return new Reference({ name: this.getVarName(inst, a) });
       });
-      const call = t.call({ name: fnName }, ["op", "value", ...attributeArgs]).toString();
+      const call = t.call(fnName, ["op", "value", ...attributeArgs]).toString();
       dbSwitch.addCase(
         new Reference({ name: inst.itemName }),
         t.block([t.code(`~ return ${call}`)]),
@@ -154,7 +171,9 @@ export function defaultForAttribute<T extends PrimitiveType>({
       return new Value(type, 0 as JSValueType<T>);
     case "string":
       return new Value(type, "" as JSValueType<T>);
-    case "knot":
+    case "reference":
+      return new Reference({ name: "InvalidDefaultRef" });
+    case "divert":
       return new Reference({ name: "null_knot", divert: true }); // FIXME: Generate it
   }
 }

@@ -14,15 +14,17 @@ function compactMap<T, U>(list: Array<T>, fn: (t: T) => U | Array<U> | null) {
 export class Generator {
   types: Array<Type<PrimitiveType>> = [];
   relations: Array<Relation<PrimitiveType, PrimitiveType>> = [];
+  file = new InkFile();
+  helpers: Array<{ type: "get" | "set"; attrName: string; fnName: string }> = [];
 
-  type<T extends PrimitiveType>(config: TypeConfig<T>) {
-    const type = new Type(config);
+  type<T extends PrimitiveType>(...params: ConstructorParameters<typeof Type<T>>) {
+    const type = new Type(...params);
     this.types.push(type);
     return type;
   }
 
-  relation(relName: string, leftType: Type<PrimitiveType>, rightType: Type<PrimitiveType>) {
-    const r = new Relation(relName, leftType, rightType);
+  relation(...params: ConstructorParameters<typeof Relation>) {
+    const r = new Relation(...params);
     this.relations.push(r);
     return r;
   }
@@ -36,42 +38,44 @@ export class Generator {
       return true;
     });
 
-    const file = new InkFile();
-    file.implicitKnot.add(...compactMap(types, (type) => type.generateList()));
-    file.implicitKnot.addEmptyLine(); // Line between LISTs and VARs
-    file.implicitKnot.add(...compactMap(types, (type) => type.generateAttributeVariables()));
+    this.file.implicitKnot.add(...compactMap(types, (type) => type.generateList()));
+    this.file.implicitKnot.addEmptyLine(); // Line between LISTs and VARs
+    this.file.implicitKnot.add(...compactMap(types, (type) => type.generateAttributeVariables()));
 
-    this.generateRelationList(file);
-    file.implicitKnot.addEmptyLine(); // Line between LIST & initial
-    file.implicitKnot.add(...compactMap(this.relations, (r) => r.generateInitialRelations()));
-    this.generateRelationsDatabase(file);
+    this.generateRelationList();
+    this.file.implicitKnot.addEmptyLine(); // Line between LIST & initial
+    this.file.implicitKnot.add(...compactMap(this.relations, (r) => r.generateInitialRelations()));
+    this.generateRelationsDatabase();
 
-    this.generateDatabaseFunction(file, types);
-    file.knots.push(...compactMap(types, (type) => type.generateDefineFunction()));
+    this.generateDatabaseFunction(types);
+    this.file.knots.push(...compactMap(types, (type) => type.generateDefineFunction()));
 
-    return file.toString();
+    for (const { type, attrName, fnName } of this.helpers) {
+      this.generateDatabaseHelper(type, attrName, fnName);
+    }
+    return this.file.toString();
   }
 
-  generateDatabaseFunction(file: InkFile, types: Array<Type<PrimitiveType>>) {
+  generateDatabaseFunction(types: Array<Type<PrimitiveType>>) {
     const dbSwitch = new SwitchStatement(new Reference({ name: "object" }));
     for (const type of types) {
       type.generateDatabaseLines(dbSwitch);
     }
     if (dbSwitch.cases.length === 0) return null;
-    file.function("database", ["op", "object", "value"], [dbSwitch]);
+    this.file.function("database", ["op", "object", "value"], [dbSwitch]);
   }
 
-  generateRelationList(file: InkFile) {
+  generateRelationList() {
     if (this.relations.length === 0) return null;
 
     const relNames = this.relations.map((r) => r.name);
-    file.implicitKnot.add(t.list("Relations", relNames));
+    this.file.implicitKnot.add(t.list("Relations", relNames));
   }
 
-  generateRelationsDatabase(file: InkFile) {
+  generateRelationsDatabase() {
     if (this.relations.length === 0) return null;
 
-    const leftRightFunc = file.function(
+    const leftRightFunc = this.file.function(
       "left_right",
       ["left", "left_list", "right_list"],
       [
@@ -93,6 +97,17 @@ export class Generator {
       );
     }
     if (relDbSwitch.cases.length === 0) return null;
-    file.function("relationDatabase", ["relation", "left"], [relDbSwitch]);
+    this.file.function("relationDatabase", ["relation", "left"], [relDbSwitch]);
+  }
+
+  addDatabaseHelper(type: "get" | "set", attrName: string, fnName?: string) {
+    this.helpers.push({ type, attrName, fnName: fnName ?? `${type}_${attrName}` });
+  }
+
+  generateDatabaseHelper(type: "get" | "set", attrName: string, fnName: string) {
+    const op = t.val("string", `${type}_${attrName}`);
+    const params = type === "get" ? ["object"] : ["object", attrName];
+    const args = type === "get" ? [op, "object", t.val("string", "")] : [op, "object", attrName];
+    this.file.function(fnName, params, [t.code(`~ return ${t.call("database", args).toString()}`)]);
   }
 }

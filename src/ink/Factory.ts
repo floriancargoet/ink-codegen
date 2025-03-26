@@ -8,7 +8,7 @@ import { RawCode } from "./RawCode.js";
 import { ReferenceConfig, Reference } from "./Reference.js";
 import { Statement } from "./Statement.js";
 import { SwitchStatement } from "./SwitchStatement.js";
-import { PrimitiveType, Value } from "./Value.js";
+import { JSValueType, PrimitiveType, Value } from "./Value.js";
 import { VarDeclaration } from "./VarDeclaration.js";
 
 export type ParametersConfig = Array<string | ParameterConfig | Parameter>;
@@ -16,6 +16,10 @@ export type ArgumentConfig = ReferenceConfig | Reference | Value<PrimitiveType>;
 export type ArgumentsConfig = Array<string | ArgumentConfig>;
 
 class Factory {
+  val<T extends PrimitiveType>(type: T, value: JSValueType<T>) {
+    return new Value(type, value);
+  }
+
   code(code: string) {
     return new RawCode(code);
   }
@@ -39,8 +43,9 @@ class Factory {
     return new ListDeclaration(name, items);
   }
 
-  call(callable: Callable, argums?: ArgumentsConfig | ArgumentList) {
+  call(fn: string | Callable, argums?: ArgumentsConfig | ArgumentList) {
     const args = t.args(argums);
+    const callable = typeof fn === "string" ? { name: fn } : fn;
     return new CallStatement({ callable, args });
   }
 

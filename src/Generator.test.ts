@@ -17,11 +17,11 @@ test("one type", () => {
 
     === function database(op, object, value)
     { object:
-    - John: ~ return define_person(op, value, John_name)
-    - Jill: ~ return define_person(op, value, Jill_name)
+    - John: ~ return get_set_person(op, value, John_name)
+    - Jill: ~ return get_set_person(op, value, Jill_name)
     }
 
-    === function define_person(op, value, ref name)
+    === function get_set_person(op, value, ref name)
     { op:
     - "get_name": ~ return name
     - "set_name": ~ name = value
@@ -44,7 +44,7 @@ test("two types", () => {
     name: "Sequence",
     attributes: [
       { type: "string", name: "name", constant: true },
-      { type: "knot", name: "knot" },
+      { type: "divert", name: "knot" },
     ],
   });
   Sequence.create({
@@ -73,19 +73,19 @@ test("two types", () => {
 
       === function database(op, object, value)
       { object:
-      - John: ~ return define_person(op, value, John_name)
-      - Jill: ~ return define_person(op, value, Jill_name)
-      - S1: ~ return define_sequence(op, value, "S1", S1_knot)
-      - S2: ~ return define_sequence(op, value, "S2", S2_knot)
+      - John: ~ return get_set_person(op, value, John_name)
+      - Jill: ~ return get_set_person(op, value, Jill_name)
+      - S1: ~ return get_set_sequence(op, value, "S1", S1_knot)
+      - S2: ~ return get_set_sequence(op, value, "S2", S2_knot)
       }
 
-      === function define_person(op, value, ref name)
+      === function get_set_person(op, value, ref name)
       { op:
       - "get_name": ~ return name
       - "set_name": ~ name = value
       }
 
-      === function define_sequence(op, value, name, ref knot)
+      === function get_set_sequence(op, value, name, ref knot)
       { op:
       - "get_name": ~ return name
       - "get_knot": ~ return knot
@@ -129,6 +129,95 @@ test("relations", () => {
     { relation:
     - WorksAt: ~ return left_right(left, Person, Workplace)
     }
+    "
+  `);
+});
+
+test("attribute of type reference", () => {
+  const gen = new Generator();
+
+  const Person = gen.type({
+    name: "Person",
+    attributes: [
+      {
+        type: "reference",
+        name: "workplace",
+      },
+    ],
+  });
+  Person.create({ itemName: "John", attributes: { workplace: "Lumen" } });
+
+  const Workplace = gen.type({ name: "Workplace" });
+  Workplace.create({ itemName: "Lumen" });
+
+  expect(gen.generate()).toMatchInlineSnapshot(`
+    "LIST People = John
+    LIST Workplaces = Lumen
+
+    VAR John_workplace = Lumen
+
+    === function database(op, object, value)
+    { object:
+    - John: ~ return get_set_person(op, value, John_workplace)
+    }
+
+    === function get_set_person(op, value, ref workplace)
+    { op:
+    - "get_workplace": ~ return workplace
+    - "set_workplace": ~ workplace = value
+    }
+    "
+  `);
+});
+
+test("database helpers", () => {
+  const gen = new Generator();
+
+  const Person = gen.type("Person").attr({ type: "string", name: "name" });
+  Person.create({ itemName: "John" });
+  Person.create({ itemName: "Jill" });
+
+  const Workplace = gen.type("Workplace").attr({ type: "string", name: "name" });
+  Workplace.create({ itemName: "Lumen" });
+  Workplace.create({ itemName: "Dunder_Mifflin" });
+
+  gen.addDatabaseHelper("get", "name");
+  gen.addDatabaseHelper("set", "name", "foobar");
+
+  expect(gen.generate()).toMatchInlineSnapshot(`
+    "LIST People = John, Jill
+    LIST Workplaces = Lumen, Dunder_Mifflin
+
+    VAR John_name = ""
+    VAR Jill_name = ""
+    VAR Lumen_name = ""
+    VAR Dunder_Mifflin_name = ""
+
+    === function database(op, object, value)
+    { object:
+    - John: ~ return get_set_person(op, value, John_name)
+    - Jill: ~ return get_set_person(op, value, Jill_name)
+    - Lumen: ~ return get_set_workplace(op, value, Lumen_name)
+    - Dunder_Mifflin: ~ return get_set_workplace(op, value, Dunder_Mifflin_name)
+    }
+
+    === function get_set_person(op, value, ref name)
+    { op:
+    - "get_name": ~ return name
+    - "set_name": ~ name = value
+    }
+
+    === function get_set_workplace(op, value, ref name)
+    { op:
+    - "get_name": ~ return name
+    - "set_name": ~ name = value
+    }
+
+    === function get_name(object)
+    ~ return database("get_name", object, "")
+
+    === function foobar(object, name)
+    ~ return database("set_name", object, name)
     "
   `);
 });
