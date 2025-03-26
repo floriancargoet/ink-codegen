@@ -1,6 +1,6 @@
 {
   "name": "@floriancargoet/ink-codegen",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Code generator for the ink language.",
   "type": "module",
   "author": "Florian Cargoët",
