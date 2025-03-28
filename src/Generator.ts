@@ -11,15 +11,22 @@ function compactMap<T, U>(list: Array<T>, fn: (t: T) => U | Array<U> | null) {
   return list.flatMap(fn).filter((x) => x != null);
 }
 
+type GeneratorData = {
+  types: Array<Type>;
+  relations: Array<Relation>;
+  helpers: Array<{ type: "get" | "set"; attrName: string; fnName: string }>;
+};
+
 export class Generator {
-  types: Array<Type> = [];
-  relations: Array<Relation> = [];
-  file = new InkFile();
-  helpers: Array<{ type: "get" | "set"; attrName: string; fnName: string }> = [];
+  data: GeneratorData = {
+    types: [],
+    relations: [],
+    helpers: [],
+  };
 
   type(...params: ConstructorParameters<typeof Type>) {
     const type = new Type(...params);
-    this.types.push(type);
+    this.data.types.push(type);
     return type;
   }
 
@@ -27,12 +34,30 @@ export class Generator {
     ...params: ConstructorParameters<typeof Relation<R, L>>
   ) {
     const r = new Relation(...params);
-    this.relations.push(r);
+    this.data.relations.push(r);
     return r;
   }
 
+  addDatabaseHelper(type: "get" | "set", attrName: string, fnName?: string) {
+    this.data.helpers.push({ type, attrName, fnName: fnName ?? `${type}_${attrName}` });
+  }
+
   generate() {
-    const types = this.types.filter((type) => {
+    const fileGen = new FileGenerator(this.data);
+    return fileGen.generate();
+  }
+}
+
+class FileGenerator {
+  file = new InkFile();
+  data: GeneratorData;
+
+  constructor(data: GeneratorData) {
+    this.data = data;
+  }
+
+  generate() {
+    const types = this.data.types.filter((type) => {
       if (type.instances.length === 0) {
         console.warn(`Type ${type.name} has no instances.`);
         return false;
@@ -46,13 +71,15 @@ export class Generator {
 
     this.generateRelationList();
     this.file.implicitKnot.addEmptyLine(); // Line between LIST & initial
-    this.file.implicitKnot.add(...compactMap(this.relations, (r) => r.generateInitialRelations()));
+    this.file.implicitKnot.add(
+      ...compactMap(this.data.relations, (r) => r.generateInitialRelations()),
+    );
     this.generateRelationsDatabase();
 
     this.generateDatabaseFunction(types);
     this.file.knots.push(...compactMap(types, (type) => type.generateDefineFunction()));
 
-    for (const { type, attrName, fnName } of this.helpers) {
+    for (const { type, attrName, fnName } of this.data.helpers) {
       this.generateDatabaseHelper(type, attrName, fnName);
     }
     return this.file.toString();
@@ -68,14 +95,14 @@ export class Generator {
   }
 
   generateRelationList() {
-    if (this.relations.length === 0) return null;
+    if (this.data.relations.length === 0) return null;
 
-    const relNames = this.relations.map((r) => r.name);
+    const relNames = this.data.relations.map((r) => r.name);
     this.file.implicitKnot.add(t.list("Relations", relNames));
   }
 
   generateRelationsDatabase() {
-    if (this.relations.length === 0) return null;
+    if (this.data.relations.length === 0) return null;
 
     const leftRightFunc = this.file.function(
       "left_right",
@@ -91,7 +118,7 @@ export class Generator {
       ],
     );
     const relDbSwitch = new SwitchStatement(new Reference({ name: "relation" }));
-    for (const rel of this.relations) {
+    for (const rel of this.data.relations) {
       const call = t.call(leftRightFunc, ["left", rel.left.name, rel.right.name]);
       relDbSwitch.addCase(
         new Reference({ name: rel.name }),
@@ -100,10 +127,6 @@ export class Generator {
     }
     if (relDbSwitch.cases.length === 0) return null;
     this.file.function("relationDatabase", ["relation", "left"], [relDbSwitch]);
-  }
-
-  addDatabaseHelper(type: "get" | "set", attrName: string, fnName?: string) {
-    this.helpers.push({ type, attrName, fnName: fnName ?? `${type}_${attrName}` });
   }
 
   generateDatabaseHelper(type: "get" | "set", attrName: string, fnName: string) {

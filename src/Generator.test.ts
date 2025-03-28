@@ -201,3 +201,18 @@ test("database helpers", () => {
     "
   `);
 });
+
+test("double generate", () => {
+  const gen = new Generator();
+  const Person = gen.type("Person");
+  Person.create("John");
+
+  expect(gen.generate()).toMatchInlineSnapshot(`
+    "LIST People = John
+    "
+  `);
+  expect(gen.generate()).toMatchInlineSnapshot(`
+    "LIST People = John
+    "
+  `);
+});
