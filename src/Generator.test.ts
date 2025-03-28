@@ -2,12 +2,9 @@ import { Generator } from "./Generator.js";
 
 test("one type", () => {
   const gen = new Generator();
-  const Person = gen.type({
-    name: "Person",
-    attributes: [{ type: "string", name: "name" }],
-  });
-  Person.create({ itemName: "John", attributes: { name: "John" } });
-  Person.create({ itemName: "Jill", attributes: { name: "Jill" } });
+  const Person = gen.type("Person").attr({ type: "string", name: "name" });
+  Person.create("John", { name: "John" });
+  Person.create("Jill", { name: "Jill" });
 
   expect(gen.generate()).toMatchInlineSnapshot(`
     "LIST People = John, Jill
@@ -33,33 +30,21 @@ test("one type", () => {
 test("two types", () => {
   const gen = new Generator();
 
-  const Person = gen.type({
-    name: "Person",
-    attributes: [{ type: "string", name: "name" }],
-  });
-  Person.create({ itemName: "John", attributes: { name: "John" } });
-  Person.create({ itemName: "Jill", attributes: { name: "Jill" } });
+  const Person = gen.type("Person").attr({ type: "string", name: "name" });
+  Person.create("John", { name: "John" });
+  Person.create("Jill");
 
-  const Sequence = gen.type({
-    name: "Sequence",
-    attributes: [
-      { type: "string", name: "name", constant: true },
-      { type: "divert", name: "knot" },
-    ],
+  const Sequence = gen
+    .type("Sequence")
+    .attr({ type: "string", name: "name", constant: true })
+    .attr({ type: "divert", name: "knot" });
+  Sequence.create("S1", {
+    name: "S1",
+    knot: "s1_knot",
   });
-  Sequence.create({
-    itemName: "S1",
-    attributes: {
-      name: "S1",
-      knot: "s1_knot",
-    },
-  });
-  Sequence.create({
-    itemName: "S2",
-    attributes: {
-      name: "S2",
-      knot: "s2_knot",
-    },
+  Sequence.create("S2", {
+    name: "S2",
+    knot: "s2_knot",
   });
 
   expect(gen.generate()).toMatchInlineSnapshot(`
@@ -67,7 +52,7 @@ test("two types", () => {
       LIST Sequences = S1, S2
 
       VAR John_name = "John"
-      VAR Jill_name = "Jill"
+      VAR Jill_name = ""
       VAR S1_knot = -> s1_knot
       VAR S2_knot = -> s2_knot
 
@@ -98,13 +83,13 @@ test("two types", () => {
 test("relations", () => {
   const gen = new Generator();
 
-  const Person = gen.type({ name: "Person" });
-  const John = Person.create({ itemName: "John" });
-  Person.create({ itemName: "Jill" });
+  const Person = gen.type("Person");
+  const John = Person.create("John");
+  Person.create("Jill");
 
-  const Workplace = gen.type({ name: "Workplace" });
-  const Lumen = Workplace.create({ itemName: "Lumen" });
-  Workplace.create({ itemName: "Dunder_Mifflin" });
+  const Workplace = gen.type("Workplace");
+  const Lumen = Workplace.create("Lumen");
+  Workplace.create("Dunder_Mifflin");
 
   const WorksAt = gen.relation("WorksAt", Person, Workplace);
 
@@ -136,19 +121,14 @@ test("relations", () => {
 test("attribute of type reference", () => {
   const gen = new Generator();
 
-  const Person = gen.type({
-    name: "Person",
-    attributes: [
-      {
-        type: "reference",
-        name: "workplace",
-      },
-    ],
+  const Person = gen.type("Person").attr({
+    type: "reference",
+    name: "workplace",
   });
-  Person.create({ itemName: "John", attributes: { workplace: "Lumen" } });
+  Person.create("John", { workplace: "Lumen" });
 
   const Workplace = gen.type({ name: "Workplace" });
-  Workplace.create({ itemName: "Lumen" });
+  Workplace.create("Lumen");
 
   expect(gen.generate()).toMatchInlineSnapshot(`
     "LIST People = John
@@ -174,12 +154,12 @@ test("database helpers", () => {
   const gen = new Generator();
 
   const Person = gen.type("Person").attr({ type: "string", name: "name" });
-  Person.create({ itemName: "John" });
-  Person.create({ itemName: "Jill" });
+  Person.create("John", { name: "John" });
+  Person.create("Jill", { name: "Jill" });
 
   const Workplace = gen.type("Workplace").attr({ type: "string", name: "name" });
-  Workplace.create({ itemName: "Lumen" });
-  Workplace.create({ itemName: "Dunder_Mifflin" });
+  Workplace.create("Lumen");
+  Workplace.create("Dunder_Mifflin");
 
   gen.addDatabaseHelper("get", "name");
   gen.addDatabaseHelper("set", "name", "foobar");
@@ -188,8 +168,8 @@ test("database helpers", () => {
     "LIST People = John, Jill
     LIST Workplaces = Lumen, Dunder_Mifflin
 
-    VAR John_name = ""
-    VAR Jill_name = ""
+    VAR John_name = "John"
+    VAR Jill_name = "Jill"
     VAR Lumen_name = ""
     VAR Dunder_Mifflin_name = ""
 

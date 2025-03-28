@@ -1,10 +1,10 @@
+import { DefaultAttributeConfig } from "./Instance.js";
 import { Relation } from "./Relation.js";
-import { Type, TypeConfig } from "./Type.js";
+import { Type } from "./Type.js";
 import { t } from "./ink/Factory.js";
 import { InkFile } from "./ink/InkFile.js";
 import { Reference } from "./ink/Reference.js";
 import { SwitchStatement } from "./ink/SwitchStatement.js";
-import { PrimitiveType } from "./ink/Value.js";
 import { u } from "./u.js";
 
 function compactMap<T, U>(list: Array<T>, fn: (t: T) => U | Array<U> | null) {
@@ -12,18 +12,20 @@ function compactMap<T, U>(list: Array<T>, fn: (t: T) => U | Array<U> | null) {
 }
 
 export class Generator {
-  types: Array<Type<PrimitiveType>> = [];
-  relations: Array<Relation<PrimitiveType, PrimitiveType>> = [];
+  types: Array<Type> = [];
+  relations: Array<Relation> = [];
   file = new InkFile();
   helpers: Array<{ type: "get" | "set"; attrName: string; fnName: string }> = [];
 
-  type<T extends PrimitiveType>(...params: ConstructorParameters<typeof Type<T>>) {
+  type(...params: ConstructorParameters<typeof Type>) {
     const type = new Type(...params);
     this.types.push(type);
     return type;
   }
 
-  relation(...params: ConstructorParameters<typeof Relation>) {
+  relation<R extends DefaultAttributeConfig, L extends DefaultAttributeConfig>(
+    ...params: ConstructorParameters<typeof Relation<R, L>>
+  ) {
     const r = new Relation(...params);
     this.relations.push(r);
     return r;
@@ -56,7 +58,7 @@ export class Generator {
     return this.file.toString();
   }
 
-  generateDatabaseFunction(types: Array<Type<PrimitiveType>>) {
+  generateDatabaseFunction(types: Array<Type>) {
     const dbSwitch = new SwitchStatement(new Reference({ name: "object" }));
     for (const type of types) {
       type.generateDatabaseLines(dbSwitch);

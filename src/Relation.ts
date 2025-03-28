@@ -1,10 +1,12 @@
-import { Instance } from "./Instance.js";
+import { DefaultAttributeConfig, Instance } from "./Instance.js";
 import { Type } from "./Type.js";
 import { Block } from "./ink/Block.js";
 import { t } from "./ink/Factory.js";
-import { PrimitiveType } from "./ink/Value.js";
 
-export class Relation<Left extends PrimitiveType, Right extends PrimitiveType> {
+export class Relation<
+  Left extends DefaultAttributeConfig = DefaultAttributeConfig,
+  Right extends DefaultAttributeConfig = DefaultAttributeConfig,
+> {
   name: string;
   left: Type<Left>;
   right: Type<Right>;

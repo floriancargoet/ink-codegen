@@ -1,6 +1,6 @@
 import { pluralize } from "inflection";
 
-import { Instance, InstanceConfig } from "./Instance.js";
+import { DefaultAttributeConfig, Instance } from "./Instance.js";
 import { ArgumentConfig, t } from "./ink/Factory.js";
 import { ParameterConfig } from "./ink/ParameterList.js";
 import { Reference } from "./ink/Reference.js";
@@ -8,53 +8,48 @@ import { Statement } from "./ink/Statement.js";
 import { SwitchStatement } from "./ink/SwitchStatement.js";
 import { JSValueType, PrimitiveType, Value } from "./ink/Value.js";
 
-export type TypeConfig<T extends PrimitiveType> = {
+export type TypeConfig = {
   name: string;
   pluralName?: string;
-  attributes?: Array<AttributeDefinition<T>>;
 };
 
-export type AttributeDefinition<T extends PrimitiveType> =
-  | {
-      type: T;
-      name: string;
-      constant?: boolean;
-      default?: JSValueType<T>;
-    }
-  | {
-      type: "divert";
-      name: string;
-      constant?: boolean;
-      default?: string;
-    }
-  | {
-      type: "reference";
-      name: string;
-      constant?: boolean;
-      default?: string; // FIXME?
-    };
+type AttrType = PrimitiveType | "divert" | "reference";
 
-export class Type<T extends PrimitiveType> {
+type WithAttr<T extends AttrType, N extends string, C extends boolean> = C extends true
+  ? { [k in N]: JSValueType<T> }
+  : { [k in N]?: JSValueType<T> };
+
+export type AttributeDefinition<T extends AttrType, N extends string, C extends boolean> = {
+  type: T;
+  name: N;
+  constant?: C;
+  default?: JSValueType<T>;
+};
+
+export type Simplify<T> = {} & { [P in keyof T]: T[P] };
+
+export class Type<AttributeConfig extends DefaultAttributeConfig = DefaultAttributeConfig> {
   name: string;
   pluralName: string;
-  attributes: Array<AttributeDefinition<T>>;
-  instances: Array<Instance<T>> = [];
+  attributes: Array<AttributeDefinition<AttrType, string, boolean>> = [];
+  instances: Array<Instance<AttributeConfig>> = [];
 
-  constructor(nameOrConfig: string | TypeConfig<T>) {
+  constructor(nameOrConfig: string | TypeConfig) {
     const config = typeof nameOrConfig === "string" ? { name: nameOrConfig } : nameOrConfig;
 
     this.name = config.name;
     this.pluralName = config.pluralName ?? pluralize(this.name);
-    this.attributes = config.attributes ?? [];
   }
 
-  attr(...attrDefs: Array<AttributeDefinition<T>>) {
-    this.attributes?.push(...attrDefs);
-    return this;
+  attr<T extends AttrType, N extends string, C extends boolean>(
+    attrDef: AttributeDefinition<T, N, C>,
+  ) {
+    this.attributes.push(attrDef);
+    return this as Type<Simplify<AttributeConfig & WithAttr<T, N, C>>>;
   }
 
-  create(config: InstanceConfig) {
-    const inst = new Instance(this, config);
+  create(itemName: string, attrs?: AttributeConfig) {
+    const inst = new Instance(this, itemName, attrs);
     this.instances.push(inst);
     return inst;
   }
@@ -65,22 +60,30 @@ export class Type<T extends PrimitiveType> {
     return t.list(this.pluralName, itemNames);
   }
 
-  getVarName(inst: Instance<T>, attr: AttributeDefinition<T>) {
+  getVarName(
+    inst: Instance<AttributeConfig>,
+    attr: AttributeDefinition<AttrType, string, boolean>,
+  ) {
     return `${inst.itemName}_${attr.name}`;
   }
 
-  getInstValue(inst: Instance<T>, attr: AttributeDefinition<T>): Value<T> | Reference | undefined {
+  getInstValue<T extends AttrType, N extends string, C extends boolean>(
+    inst: Instance<WithAttr<T, N, C>>,
+    attr: AttributeDefinition<T, N, C>,
+  ) {
     // We trust the inst to be correctly set up, we can't verify that with types.
-    const value = inst.attributes?.[attr.name] as JSValueType<T> | undefined;
+    const value = inst.attributes[attr.name]; // as JSValueType<T> | undefined;
     if (!value) return;
     if (attr.type === "divert") return new Reference({ name: String(value), divert: true });
     if (attr.type === "reference") return new Reference({ name: String(value) });
     return new Value(attr.type, value);
   }
 
-  getVarValue(inst: Instance<T>, attr: AttributeDefinition<T>) {
-    let value: Value<T> | Reference | undefined;
-    value = this.getInstValue(inst, attr);
+  getVarValue<T extends AttrType, N extends string, C extends boolean>(
+    inst: Instance<WithAttr<T, N, C>>,
+    attr: AttributeDefinition<T, N, C>,
+  ) {
+    let value = this.getInstValue(inst, attr);
     if (value == null && attr.default) {
       if (attr.type === "divert") {
         value = new Reference({ name: String(attr.default), divert: true });
@@ -89,8 +92,7 @@ export class Type<T extends PrimitiveType> {
       } else value = new Value(attr.type, attr.default as JSValueType<T>);
     }
 
-    if (value == null) value = defaultForAttribute(attr);
-    return value;
+    return value ?? defaultForAttribute(attr);
   }
 
   generateAttributeVariables() {
@@ -161,16 +163,16 @@ export class Type<T extends PrimitiveType> {
   }
 }
 
-export function defaultForAttribute<T extends PrimitiveType>({
+export function defaultForAttribute<T extends AttrType>({
   type,
-}: AttributeDefinition<T>): Value<T> | Reference {
+}: AttributeDefinition<T, string, boolean>) {
   switch (type) {
     case "boolean":
-      return new Value(type, false as JSValueType<T>);
+      return new Value(type, false);
     case "integer":
-      return new Value(type, 0 as JSValueType<T>);
+      return new Value(type, 0);
     case "string":
-      return new Value(type, "" as JSValueType<T>);
+      return new Value(type, "");
     case "reference":
       return new Reference({ name: "InvalidDefaultRef" });
     case "divert":

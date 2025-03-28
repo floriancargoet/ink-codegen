@@ -1,7 +1,10 @@
 import { Base } from "./Base.js";
 
 export type PrimitiveType = "string" | "integer" | "boolean";
-export type JSValueType<T extends PrimitiveType> = T extends "string"
+export type JSValueType<T extends PrimitiveType | "divert" | "reference"> = T extends
+  | "string"
+  | "divert"
+  | "reference"
   ? string
   : T extends "boolean"
     ? boolean

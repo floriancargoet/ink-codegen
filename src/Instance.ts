@@ -1,19 +1,15 @@
 import { Type } from "./Type.js";
-import { PrimitiveType } from "./ink/Value.js";
 
-export type InstanceConfig = {
+export type DefaultAttributeConfig = object;
+
+export class Instance<AttributeConfig extends DefaultAttributeConfig = DefaultAttributeConfig> {
+  type: Type<AttributeConfig>;
   itemName: string;
-  attributes?: Record<string, string | number | boolean>;
-};
+  attributes: AttributeConfig;
 
-export class Instance<T extends PrimitiveType> {
-  type: Type<T>;
-  itemName: string;
-  attributes?: Record<string, string | number | boolean>;
-
-  constructor(type: Type<T>, { itemName, attributes }: InstanceConfig) {
+  constructor(type: Type<AttributeConfig>, itemName: string, attributes?: AttributeConfig) {
     this.type = type;
     this.itemName = itemName;
-    this.attributes = attributes;
+    this.attributes = attributes ?? ({} as AttributeConfig);
   }
 }
